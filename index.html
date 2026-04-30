@@ -3,47 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demo Frontend WSL</title>
+    <title>PTIT - Hệ thống Đăng nhập & Quản lý Profile</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
+        body { font-family: Arial, sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 40px; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 400px; }
+        input[type="text"], input[type="password"], input[type="email"], input[type="file"] {
+            width: 100%; padding: 10px; margin: 8px 0 15px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;
         }
-        .card {
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        h1 {
-            color: #333;
-        }
-        button {
-            padding: 10px 20px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #218838;
-        }
+        label { font-weight: bold; font-size: 14px; color: #333; }
+        button { width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-bottom: 10px;}
+        button:hover { background: #218838; }
+        .btn-secondary { background: #6c757d; }
+        .btn-secondary:hover { background: #5a6268; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .hidden { display: none; }
+        .avatar-preview { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; display: block; margin: 0 auto 15px; border: 2px solid #ddd; }
+        h2 { text-align: center; color: #333; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>PTIT-ISP</h1>
-        <p>Nguyễn Duy Phong.</p>
-        
+
+    <div class="card" id="auth-form">
+        <h2>Đăng nhập / Đăng ký</h2>
+        <label>Tên đăng nhập:</label>
+        <input type="text" id="username" placeholder="Nhập username">
+
+        <label>Mật khẩu:</label>
+        <input type="password" id="password" placeholder="Nhập mật khẩu">
+
+        <button onclick="handleAction('login')">Đăng nhập</button>
+        <button class="btn-secondary" onclick="handleAction('register')">Đăng ký</button>
     </div>
-   
+
+    <div class="card hidden" id="profile-card">
+        <h2>Thông tin cá nhân</h2>
+        <img id="view-avatar" class="avatar-preview" src="" alt="Avatar">
+        <p style="text-align: center; font-size: 18px;">Xin chào, <strong id="user-display"></strong>!</p>
+
+        <label>Họ và tên:</label>
+        <input type="text" id="fullname" placeholder="Ví dụ: Nguyễn Duy Phong">
+
+        <label>Email:</label>
+        <input type="email" id="email" placeholder="Ví dụ: phong@ptit.edu.vn">
+
+        <label>Số điện thoại:</label>
+        <input type="text" id="phone" placeholder="Nhập số điện thoại">
+
+        <label>Đổi Ảnh đại diện (Upload):</label>
+        <input type="file" id="avatar-input" accept="image/*">
+
+        <button onclick="updateProfile()">Cập nhật thông tin</button>
+        <button class="btn-danger" onclick="logout()">Đăng xuất</button>
+    </div>
+
+    <script>
+        window.onload = checkSession;
+
+        async function checkSession() {
+            try {
+                const res = await fetch('/profile');
+                if (res.ok) {
+                    const user = await res.json();
+                    showProfile(user);
+                }
+            } catch (e) {
+                console.log("Chưa có phiên đăng nhập hợp lệ.");
+            }
+        }
+
+        async function handleAction(type) {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+
+            const res = await fetch(`/${type}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user, password: pass})
+            });
+
+            if (type === 'register') {
+                const msg = await res.text();
+                alert(msg);
+            } else if (type === 'login') {
+                if (res.ok) {
+                    checkSession(); 
+                } else {
+                    const errorMsg = await res.text();
+                    alert(errorMsg);
+                }
+            }
+        }
+
+        function showProfile(user) {
+            document.getElementById('auth-form').classList.add('hidden');
+            document.getElementById('profile-card').classList.remove('hidden');
+
+            document.getElementById('user-display').innerText = user.username;
+            document.getElementById('fullname').value = user.fullname || '';
+            document.getElementById('email').value = user.email || '';
+            document.getElementById('phone').value = user.phone || '';
+
+            if (user.avatar && user.avatar !== 'default-avatar.png') {
+                document.getElementById('view-avatar').src = `/uploads/${user.avatar}`;
+            } else {
+                document.getElementById('view-avatar').src = `https://via.placeholder.com/150?text=No+Avatar`;
+            }
+        }
+
+        async function updateProfile() {
+            const formData = new FormData();
+            formData.append('fullname', document.getElementById('fullname').value);
+            formData.append('email', document.getElementById('email').value);
+            formData.append('phone', document.getElementById('phone').value);
+
+            const fileInput = document.getElementById('avatar-input');
+            if (fileInput.files[0]) {
+                formData.append('avatar', fileInput.files[0]);
+            }
+
+            const res = await fetch('/update-profile', {
+                method: 'POST',
+                body: formData
+            });
+
+            const msg = await res.text();
+            alert(msg);
+            if (res.ok) {
+                checkSession(); 
+            }
+        }
+
+        async function logout() {
+            await fetch('/logout');
+            location.reload(); 
+        }
+    </script>
 </body>
 </html>
